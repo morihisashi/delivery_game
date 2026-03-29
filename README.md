@@ -1,17 +1,37 @@
 # delivery_game
 
-A new Flutter project.
+配達ゲーム（MVP）の Flutter 実装です。
 
-## Getting Started
+## Requirements
 
-This project is a starting point for a Flutter application.
+- Flutter SDK（`flutter --version` が通ること）
 
-A few resources to get you started if this is your first Flutter project:
+## Run
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+依存関係を取得して起動します。
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter pub get
+flutter run
+```
+
+## Test / Analyze
+
+このプロジェクトのテストは `test/widget_test.dart` のウィジェットテストです。
+
+### Static analysis（静的解析）
+
+```bash
+flutter analyze
+```
+
+### Unit/Widget tests（テスト実行）
+
+```bash
+flutter test
+```
+
+## Notes
+
+- タイマーは `GameController` が管理し、UI は `onTick` コールバック経由で再描画します。
+- 操作は「1入力 = 1マス移動」です（長押し連続移動はしません）。
