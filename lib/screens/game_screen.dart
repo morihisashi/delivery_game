@@ -70,7 +70,22 @@ class _GameScreenState extends State<GameScreen> {
                       return Colors.white;
                     }();
 
-                    return GridCell(color: color);
+                    final child = () {
+                      if (p != controller.playerPosition) return null;
+
+                      return Opacity(
+                        opacity: controller.hasPackage ? 1.0 : 0.7,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.asset(
+                            'assets/images/delivery_icon.jpg',
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      );
+                    }();
+
+                    return GridCell(color: color, child: child);
                   },
                 ),
               ),
