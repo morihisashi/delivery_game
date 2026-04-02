@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../controllers/game_controller.dart';
@@ -16,6 +18,8 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> {
   late final GameController controller;
+  Timer? _moveTimer;
+  Direction? _currentDirection;
 
   @override
   void initState() {
@@ -29,8 +33,34 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   void dispose() {
+    _stopMoving();
     controller.dispose();
     super.dispose();
+  }
+
+  void _startMoving(Direction dir) {
+    if (controller.gameStatus == GameStatus.finished) return;
+
+    _currentDirection = dir;
+
+    setState(() {
+      controller.step(dir);
+    });
+
+    _moveTimer?.cancel();
+    _moveTimer = Timer.periodic(const Duration(milliseconds: 150), (_) {
+      if (controller.gameStatus == GameStatus.finished) return;
+
+      setState(() {
+        controller.step(dir);
+      });
+    });
+  }
+
+  void _stopMoving() {
+    _moveTimer?.cancel();
+    _moveTimer = null;
+    _currentDirection = null;
   }
 
   @override
@@ -112,9 +142,9 @@ class _GameScreenState extends State<GameScreen> {
             )
           else
             _Controls(
-              onMove: (dir) {
-                controller.step(dir);
-              },
+              hasPackage: controller.hasPackage,
+              onStartMove: _startMoving,
+              onStopMove: _stopMoving,
             ),
         ],
       ),
@@ -123,9 +153,42 @@ class _GameScreenState extends State<GameScreen> {
 }
 
 class _Controls extends StatelessWidget {
-  const _Controls({required this.onMove});
+  const _Controls({
+    required this.onStartMove,
+    required this.onStopMove,
+    required this.hasPackage,
+  });
 
-  final void Function(Direction dir) onMove;
+  final void Function(Direction dir) onStartMove;
+  final VoidCallback onStopMove;
+  final bool hasPackage;
+
+  static const double _buttonSize = 80;
+  static const double _iconSize = 40;
+
+  Widget _buildButton(IconData icon, Direction dir) {
+    return GestureDetector(
+      onTapDown: (_) => onStartMove(dir),
+      onTapUp: (_) => onStopMove(),
+      onTapCancel: onStopMove,
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: SizedBox(
+          width: _buttonSize,
+          height: _buttonSize,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              shape: const CircleBorder(),
+              backgroundColor: hasPackage ? Colors.orange : Colors.blue,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: null,
+            child: Icon(icon, size: _iconSize),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -134,28 +197,16 @@ class _Controls extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          ElevatedButton(
-            onPressed: () => onMove(Direction.up),
-            child: const Text('↑'),
-          ),
+          _buildButton(Icons.arrow_upward, Direction.up),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              ElevatedButton(
-                onPressed: () => onMove(Direction.left),
-                child: const Text('←'),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton(
-                onPressed: () => onMove(Direction.right),
-                child: const Text('→'),
-              ),
+              _buildButton(Icons.arrow_back, Direction.left),
+              const SizedBox(width: 20),
+              _buildButton(Icons.arrow_forward, Direction.right),
             ],
           ),
-          ElevatedButton(
-            onPressed: () => onMove(Direction.down),
-            child: const Text('↓'),
-          ),
+          _buildButton(Icons.arrow_downward, Direction.down),
         ],
       ),
     );
