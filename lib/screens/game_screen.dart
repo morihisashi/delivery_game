@@ -61,7 +61,10 @@ class _GameScreenState extends State<GameScreen> {
                     final color = () {
                       if (p == controller.playerPosition) return Colors.blue;
                       if (controller.storePositions.contains(p)) {
-                        return Colors.green;
+                        if (p == controller.currentStorePosition) {
+                          return Colors.green.shade800;
+                        }
+                        return Colors.green.shade200;
                       }
                       if (p == controller.targetPosition) return Colors.red;
                       return Colors.white;
