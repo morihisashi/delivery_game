@@ -28,6 +28,7 @@ class GameController {
     const Position(8, 8),
   };
 
+  Position currentStorePosition = const Position(1, 1);
   Position targetPosition = const Position(0, 0);
 
   bool hasPackage = false;
@@ -44,6 +45,7 @@ class GameController {
     timeLeft = initialTimeSeconds;
     gameStatus = GameStatus.playing;
 
+    selectNextStore();
     targetPosition = spawnTarget(avoidCurrentTarget: false);
 
     onTick?.call();
@@ -86,7 +88,7 @@ class GameController {
     if (timeLeft <= 0) return;
 
     movePlayer(dir);
-    pickupIfOnStore();
+    pickupIfOnCurrentStore();
     deliverIfOnTarget();
 
     onTick?.call();
@@ -99,8 +101,8 @@ class GameController {
     }
   }
 
-  void pickupIfOnStore() {
-    if (storePositions.contains(playerPosition)) {
+  void pickupIfOnCurrentStore() {
+    if (!hasPackage && playerPosition == currentStorePosition) {
       hasPackage = true;
     }
   }
@@ -110,7 +112,13 @@ class GameController {
       score += 1;
       hasPackage = false;
       targetPosition = spawnTarget(avoidCurrentTarget: true);
+      selectNextStore();
     }
+  }
+
+  void selectNextStore() {
+    final stores = storePositions.toList()..shuffle(_random);
+    currentStorePosition = stores.first;
   }
 
   Position spawnTarget({required bool avoidCurrentTarget}) {

@@ -10,6 +10,7 @@ class HudBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final statusText = controller.hasPackage ? '配達中' : '未所持';
+    final storeText = controller.currentStorePosition.toString();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       color: Colors.black12,
@@ -20,6 +21,8 @@ class HudBar extends StatelessWidget {
           Text('Time: ${controller.timeLeft}'),
           const SizedBox(width: 16),
           Text('状態: $statusText'),
+          const SizedBox(width: 16),
+          Text('指定店舗: $storeText'),
           const Spacer(),
           Text('Pos: ${controller.playerPosition}'),
         ],
