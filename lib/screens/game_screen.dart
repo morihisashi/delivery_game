@@ -19,7 +19,6 @@ class GameScreen extends StatefulWidget {
 class _GameScreenState extends State<GameScreen> {
   late final GameController controller;
   Timer? _moveTimer;
-  Direction? _currentDirection;
 
   @override
   void initState() {
@@ -41,8 +40,6 @@ class _GameScreenState extends State<GameScreen> {
   void _startMoving(Direction dir) {
     if (controller.gameStatus == GameStatus.finished) return;
 
-    _currentDirection = dir;
-
     setState(() {
       controller.step(dir);
     });
@@ -60,7 +57,6 @@ class _GameScreenState extends State<GameScreen> {
   void _stopMoving() {
     _moveTimer?.cancel();
     _moveTimer = null;
-    _currentDirection = null;
   }
 
   @override
@@ -89,14 +85,21 @@ class _GameScreenState extends State<GameScreen> {
                     final p = Position(x, y);
 
                     final color = () {
-                      if (p == controller.playerPosition) return Colors.blue;
-                      if (controller.storePositions.contains(p)) {
-                        if (p == controller.currentStorePosition) {
-                          return Colors.green.shade800;
-                        }
-                        return Colors.green.shade200;
+                      if (p == controller.targetPosition) {
+                        return Colors.red.shade600;
                       }
-                      if (p == controller.targetPosition) return Colors.red;
+                      if (p == controller.currentStorePosition) {
+                        return Colors.blue.shade800;
+                      }
+                      if (controller.storePositions.contains(p)) {
+                        return Colors.blue.shade400;
+                      }
+                      if (controller.allEntrances.contains(p)) {
+                        return Colors.amber.shade600;
+                      }
+                      if (controller.isRoad(p)) {
+                        return Colors.grey.shade400;
+                      }
                       return Colors.white;
                     }();
 
