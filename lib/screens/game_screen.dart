@@ -45,7 +45,7 @@ class _GameScreenState extends State<GameScreen> {
     });
 
     _moveTimer?.cancel();
-    _moveTimer = Timer.periodic(const Duration(milliseconds: 150), (_) {
+    _moveTimer = Timer.periodic(const Duration(milliseconds: 120), (_) {
       if (controller.gameStatus == GameStatus.finished) return;
 
       setState(() {
@@ -84,38 +84,87 @@ class _GameScreenState extends State<GameScreen> {
 
                     final p = Position(x, y);
 
+                    final isPlayer = p == controller.playerPosition;
+                    final isEnemy = p == controller.enemy.position;
+                    final isTarget = p == controller.targetPosition;
+                    final isCurrentStore =
+                        p == controller.currentStorePosition;
+                    final isOtherStore =
+                        !isCurrentStore &&
+                        controller.storePositions.contains(p);
+
                     final color = () {
-                      if (p == controller.targetPosition) {
-                        return Colors.red.shade600;
-                      }
-                      if (p == controller.currentStorePosition) {
-                        return Colors.blue.shade800;
-                      }
-                      if (controller.storePositions.contains(p)) {
-                        return Colors.blue.shade400;
-                      }
-                      if (controller.allEntrances.contains(p)) {
-                        return Colors.amber.shade600;
-                      }
-                      if (controller.isRoad(p)) {
-                        return Colors.grey.shade400;
-                      }
+                      if (isEnemy) return Colors.deepPurple.shade400;
+                      if (isTarget) return Colors.red.shade400;
+                      if (isCurrentStore) return Colors.green.shade600;
+                      if (isOtherStore) return Colors.green.shade200;
+                      if (controller.isRoad(p)) return Colors.grey.shade400;
                       return Colors.white;
                     }();
 
                     final child = () {
-                      if (p != controller.playerPosition) return null;
+                      final playerWidget = isPlayer
+                          ? Opacity(
+                              opacity: controller.hasPackage ? 1.0 : 0.7,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.asset(
+                                  'assets/images/delivery_icon.jpg',
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            )
+                          : null;
 
-                      return Opacity(
-                        opacity: controller.hasPackage ? 1.0 : 0.7,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.asset(
-                            'assets/images/delivery_icon.jpg',
-                            fit: BoxFit.cover,
+                      final enemyWidget = isEnemy
+                          ? const Center(
+                              child: Text(
+                                '🦀',
+                                style: TextStyle(fontSize: 20),
+                              ),
+                            )
+                          : null;
+
+                      if (playerWidget != null && enemyWidget != null) {
+                        return Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            playerWidget,
+                            Align(alignment: Alignment.center, child: enemyWidget),
+                          ],
+                        );
+                      }
+                      if (playerWidget != null) return playerWidget;
+                      if (enemyWidget != null) return enemyWidget;
+
+                      if (isTarget) {
+                        return const Center(
+                          child: Icon(
+                            Icons.location_on,
+                            color: Colors.white,
+                            size: 22,
                           ),
-                        ),
-                      );
+                        );
+                      }
+                      if (isCurrentStore) {
+                        return const Center(
+                          child: Icon(
+                            Icons.inventory_2,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                        );
+                      }
+                      if (isOtherStore) {
+                        return const Center(
+                          child: Icon(
+                            Icons.inventory_2_outlined,
+                            color: Colors.white54,
+                            size: 18,
+                          ),
+                        );
+                      }
+                      return null;
                     }();
 
                     return GridCell(color: color, child: child);
@@ -166,27 +215,28 @@ class _Controls extends StatelessWidget {
   final VoidCallback onStopMove;
   final bool hasPackage;
 
-  static const double _buttonSize = 80;
-  static const double _iconSize = 40;
+  static const double _buttonSize = 108;
+  static const double _iconSize = 52;
+  static const double _gapBetweenLR = 28;
 
   Widget _buildButton(IconData icon, Direction dir) {
+    final bg = hasPackage ? Colors.orange : Colors.blue;
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTapDown: (_) => onStartMove(dir),
       onTapUp: (_) => onStopMove(),
       onTapCancel: onStopMove,
       child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: SizedBox(
-          width: _buttonSize,
-          height: _buttonSize,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              shape: const CircleBorder(),
-              backgroundColor: hasPackage ? Colors.orange : Colors.blue,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: null,
-            child: Icon(icon, size: _iconSize),
+        padding: const EdgeInsets.all(10),
+        child: Material(
+          color: bg,
+          shape: const CircleBorder(),
+          elevation: 3,
+          shadowColor: Colors.black45,
+          child: SizedBox(
+            width: _buttonSize,
+            height: _buttonSize,
+            child: Icon(icon, size: _iconSize, color: Colors.white),
           ),
         ),
       ),
@@ -196,7 +246,7 @@ class _Controls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -205,7 +255,7 @@ class _Controls extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _buildButton(Icons.arrow_back, Direction.left),
-              const SizedBox(width: 20),
+              const SizedBox(width: _gapBetweenLR),
               _buildButton(Icons.arrow_forward, Direction.right),
             ],
           ),

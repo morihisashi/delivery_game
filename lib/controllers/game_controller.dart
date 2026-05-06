@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../data/game_map_data.dart';
 import '../models/building.dart';
 import '../models/direction.dart';
+import '../models/enemy.dart';
 import '../models/game_status.dart';
 import '../models/position.dart';
 import '../models/tile_type.dart';
@@ -20,6 +21,8 @@ class GameController {
   final Random _random;
 
   Timer? _timer;
+  Timer? _enemyTimer;
+  Timer? _stunTimer;
   VoidCallback? onTick;
 
   /// 店舗（5件）。建物マスへは、上下左右に隣接する道路マスのいずれからでも侵入可能。
@@ -31,6 +34,9 @@ class GameController {
   Position targetPosition = const Position(0, 0);
 
   Position playerPosition = const Position(0, 0);
+
+  Enemy enemy = Enemy(const Position(0, 0));
+  bool isStunned = false;
 
   bool hasPackage = false;
   int score = 0;
@@ -74,6 +80,8 @@ class GameController {
 
   void resetGame() {
     stopTimer();
+    stopEnemyMovement();
+    _clearStun();
 
     hasPackage = false;
     score = 0;
@@ -81,6 +89,7 @@ class GameController {
     gameStatus = GameStatus.playing;
 
     _setupWorld();
+    startEnemyMovement();
 
     onTick?.call();
   }
@@ -92,6 +101,8 @@ class GameController {
 
     playerPosition = _pickInitialPlayerRoad();
     selectNextStore();
+
+    enemy = Enemy(_spawnEnemyRoadPosition(minManhattanDistance: 2));
   }
 
   void startTimer() {
@@ -124,15 +135,19 @@ class GameController {
 
   void dispose() {
     stopTimer();
+    stopEnemyMovement();
+    _clearStun();
   }
 
   void step(Direction dir) {
     if (gameStatus != GameStatus.playing) return;
     if (timeLeft <= 0) return;
+    if (isStunned) return;
 
     movePlayer(dir);
     pickupIfOnCurrentStore();
     deliverIfOnTarget();
+    _checkCollision();
 
     onTick?.call();
   }
@@ -143,6 +158,64 @@ class GameController {
     if (!_isInBounds(next)) return;
     if (!canMove(from, next)) return;
     playerPosition = next;
+  }
+
+  void startEnemyMovement() {
+    stopEnemyMovement();
+
+    if (gameStatus != GameStatus.playing) return;
+
+    _enemyTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (gameStatus != GameStatus.playing) {
+        stopEnemyMovement();
+        return;
+      }
+
+      moveEnemy();
+      onTick?.call();
+    });
+  }
+
+  void stopEnemyMovement() {
+    _enemyTimer?.cancel();
+    _enemyTimer = null;
+  }
+
+  void moveEnemy() {
+    final dirs = Direction.values.toList()..shuffle(_random);
+
+    for (final dir in dirs) {
+      final next = _moved(enemy.position, dir);
+      if (!_isInBounds(next)) continue;
+      if (!isRoad(next)) continue;
+      enemy.position = next;
+      break;
+    }
+
+    _checkCollision();
+  }
+
+  void _checkCollision() {
+    if (enemy.position == playerPosition) {
+      _stunPlayer();
+    }
+  }
+
+  void _stunPlayer() {
+    if (isStunned) return;
+
+    isStunned = true;
+    _stunTimer?.cancel();
+    _stunTimer = Timer(const Duration(seconds: 3), () {
+      isStunned = false;
+      onTick?.call();
+    });
+  }
+
+  void _clearStun() {
+    _stunTimer?.cancel();
+    _stunTimer = null;
+    isStunned = false;
   }
 
   /// 道路は自由。店舗・配達先の建物マスは、**隣接する道路マス**からならどこからでも進入可能。
@@ -250,6 +323,33 @@ class GameController {
     }
     roads.shuffle(_random);
     return roads.isEmpty ? const Position(0, 0) : roads.first;
+  }
+
+  Position _spawnEnemyRoadPosition({required int minManhattanDistance}) {
+    final roads = <Position>[];
+    for (var y = 0; y < gridSize; y++) {
+      for (var x = 0; x < gridSize; x++) {
+        final p = Position(x, y);
+        if (!isRoad(p)) continue;
+        final dist = (p.x - playerPosition.x).abs() + (p.y - playerPosition.y).abs();
+        if (dist < minManhattanDistance) continue;
+        roads.add(p);
+      }
+    }
+
+    roads.shuffle(_random);
+    if (roads.isNotEmpty) return roads.first;
+
+    // フォールバック：距離制約なしで道路から選ぶ
+    final anyRoads = <Position>[];
+    for (var y = 0; y < gridSize; y++) {
+      for (var x = 0; x < gridSize; x++) {
+        final p = Position(x, y);
+        if (isRoad(p)) anyRoads.add(p);
+      }
+    }
+    anyRoads.shuffle(_random);
+    return anyRoads.isEmpty ? const Position(0, 0) : anyRoads.first;
   }
 
   static const List<(int, int)> _orthoDeltas = [
