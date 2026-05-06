@@ -105,6 +105,16 @@
 
 ---
 
+### 4.5 蟹（動的障害物）
+
+* 常に1匹存在する
+* 道路(1)のマス上のみを移動する
+* 1秒ごとに1マス移動（上下左右ランダム）
+* プレイヤーと同じマスにいる（衝突）と、プレイヤーは**3秒間行動不能（スタン）**になる
+  * スタン中は再スタンしない
+
+---
+
 ## 5. 状態管理（State）
 
 ```text
@@ -112,6 +122,8 @@ playerPosition
 buildings（店舗5件：position）
 currentStoreIndex（または currentStore）
 targetPosition
+enemyPosition（蟹）
+isStunned（プレイヤーがスタン中か）
 hasPackage
 score
 timeLeft
@@ -134,6 +146,8 @@ movePlayer(direction)
 * `next` が道路(1) → 移動可能
 * `next` が店舗または配達先の**建物マス** → `from` が**道路(1)**かつ `from` が `next` と**上下左右で隣接**するときのみ移動可能（隣接道路が複数あればすべてから可）
 * 上記以外（建物のない空き `0` など）→ 移動不可
+
+加えて、プレイヤーがスタン中（`isStunned == true`）は移動入力を受け付けない。
 
 補足：建物マスから外へ出るときは、通常 `next` が道路（入口）になるため道路ルールで通過できる。
 
@@ -190,6 +204,27 @@ if playerPosition == targetPosition AND hasPackage:
 
 ---
 
+### 6.7 蟹の移動と衝突
+
+* 1秒ごとに上下左右へランダムに1マス移動する（道路のみ）
+* 衝突判定：
+
+```text
+if enemyPosition == playerPosition:
+    stunPlayer()
+```
+
+* スタン：
+
+```text
+stunPlayer():
+    if isStunned: return
+    isStunned = true
+    3秒後に isStunned = false
+```
+
+---
+
 ## 7. UI仕様
 
 ### 7.1 グリッド表示
@@ -200,11 +235,11 @@ if playerPosition == targetPosition AND hasPackage:
 | 店舗（通常） | 青（薄め） |
 | 指定店舗 | 青（濃い） |
 | 配達先 | 赤 |
-| 建物に隣接する道路（侵入可能側） | 黄系ハイライト（複数あればすべて） |
 | 空き区画（建物なし） | 白 |
 | プレイヤー | 画像アイコン |
+| 蟹（障害物） | 紫系背景 + 🦀 |
 
-（同一マスに複数要素が重なる場合は、優先度を実装で決める。）
+（同一マスに複数要素が重なる場合は、視認性が落ちない範囲で重ね表示してよい。） 
 
 ---
 
