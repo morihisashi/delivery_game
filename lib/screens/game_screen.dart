@@ -3,14 +3,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../controllers/game_controller.dart';
+import '../models/difficulty_settings.dart';
 import '../models/direction.dart';
+import '../models/game_difficulty.dart';
 import '../models/game_status.dart';
 import '../models/position.dart';
 import '../widgets/grid_cell.dart';
 import '../widgets/hud_bar.dart';
 
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key});
+  const GameScreen({super.key, required this.difficulty});
+
+  final GameDifficulty difficulty;
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -24,7 +28,8 @@ class _GameScreenState extends State<GameScreen> {
   void initState() {
     super.initState();
 
-    controller = GameController();
+    final settings = DifficultySettings.forDifficulty(widget.difficulty);
+    controller = GameController(settings: settings);
     controller.onTick = () => setState(() {});
     controller.resetGame();
     controller.startTimer();
@@ -38,7 +43,7 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _startMoving(Direction dir) {
-    if (controller.gameStatus == GameStatus.finished) return;
+    if (controller.gameStatus != GameStatus.playing) return;
 
     setState(() {
       controller.step(dir);
@@ -46,7 +51,7 @@ class _GameScreenState extends State<GameScreen> {
 
     _moveTimer?.cancel();
     _moveTimer = Timer.periodic(const Duration(milliseconds: 120), (_) {
-      if (controller.gameStatus == GameStatus.finished) return;
+      if (controller.gameStatus != GameStatus.playing) return;
 
       setState(() {
         controller.step(dir);
@@ -61,10 +66,17 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final finished = controller.gameStatus == GameStatus.finished;
+    final notPlaying = controller.gameStatus != GameStatus.playing;
+    final cleared = controller.gameStatus == GameStatus.cleared;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Delivery Game')),
+      appBar: AppBar(
+        title: const Text('Delivery Game'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
       body: Column(
         children: [
           HudBar(controller: controller),
@@ -85,7 +97,7 @@ class _GameScreenState extends State<GameScreen> {
                     final p = Position(x, y);
 
                     final isPlayer = p == controller.playerPosition;
-                    final isEnemy = p == controller.enemy.position;
+                    final isEnemy = controller.isEnemyAt(p);
                     final isTarget = p == controller.targetPosition;
                     final isCurrentStore =
                         p == controller.currentStorePosition;
@@ -173,21 +185,29 @@ class _GameScreenState extends State<GameScreen> {
               ),
             ),
           ),
-          if (finished)
+          if (notPlaying)
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
                 children: [
-                  const Text('Game Over', style: TextStyle(fontSize: 20)),
+                  Text(
+                    cleared ? 'クリア！' : 'Game Over',
+                    style: const TextStyle(fontSize: 20),
+                  ),
                   const SizedBox(height: 8),
-                  Text('Final Score: ${controller.score}'),
+                  Text('Score: ${controller.score}/${controller.clearScore}'),
                   const SizedBox(height: 8),
                   ElevatedButton(
                     onPressed: () {
                       controller.resetGame();
                       controller.startTimer();
                     },
-                    child: const Text('Restart'),
+                    child: const Text('もう一度'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('タイトルへ'),
                   ),
                 ],
               ),

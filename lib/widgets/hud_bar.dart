@@ -16,7 +16,9 @@ class HudBar extends StatelessWidget {
       color: Colors.black12,
       child: Row(
         children: [
-          Text('Score: ${controller.score}'),
+          Text(
+            'Score: ${controller.score}/${controller.clearScore}',
+          ),
           const SizedBox(width: 16),
           Text('Time: ${controller.timeLeft}'),
           const SizedBox(width: 16),
