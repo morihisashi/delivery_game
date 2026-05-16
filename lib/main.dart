@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'screens/game_screen.dart';
+import 'screens/title_screen.dart';
 
 void main() {
   runApp(const DeliveryGameApp());
@@ -17,7 +17,7 @@ class DeliveryGameApp extends StatelessWidget {
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const GameScreen(),
+      home: const TitleScreen(),
     );
   }
 }

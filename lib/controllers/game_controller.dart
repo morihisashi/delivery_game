@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../data/game_map_data.dart';
 import '../models/building.dart';
+import '../models/difficulty_settings.dart';
 import '../models/direction.dart';
 import '../models/enemy.dart';
 import '../models/game_status.dart';
@@ -13,11 +14,12 @@ import '../models/tile_type.dart';
 
 class GameController {
   static const int gridSize = 10;
-  static const int initialTimeSeconds = 60;
   static const int storeCount = 5;
 
-  GameController({Random? random}) : _random = random ?? Random();
+  GameController({required this.settings, Random? random})
+    : _random = random ?? Random();
 
+  final DifficultySettings settings;
   final Random _random;
 
   Timer? _timer;
@@ -25,23 +27,21 @@ class GameController {
   Timer? _stunTimer;
   VoidCallback? onTick;
 
-  /// 店舗（5件）。建物マスへは、上下左右に隣接する道路マスのいずれからでも侵入可能。
   List<Building> buildings = [];
-
-  /// 現在の指定店舗（`buildings` の要素への参照ではなく index で持つ）
   int _currentStoreIndex = 0;
 
   Position targetPosition = const Position(0, 0);
-
   Position playerPosition = const Position(0, 0);
 
-  Enemy enemy = Enemy(const Position(0, 0));
+  List<Enemy> enemies = [];
   bool isStunned = false;
 
   bool hasPackage = false;
   int score = 0;
-  int timeLeft = initialTimeSeconds;
+  late int timeLeft;
   GameStatus gameStatus = GameStatus.playing;
+
+  int get clearScore => settings.clearScore;
 
   int tileAt(Position p) => GameMapData.cells[p.y][p.x];
 
@@ -59,7 +59,8 @@ class GameController {
   Set<Position> get storePositions =>
       buildings.map((b) => b.position).toSet();
 
-  /// 各建物に隣接する道路マス（入口候補）。複数道路に面している場合はすべて含む。
+  bool isEnemyAt(Position p) => enemies.any((e) => e.position == p);
+
   Set<Position> get allEntrances {
     final s = <Position>{};
     for (final b in buildings) {
@@ -85,7 +86,7 @@ class GameController {
 
     hasPackage = false;
     score = 0;
-    timeLeft = initialTimeSeconds;
+    timeLeft = settings.timeLimitSeconds;
     gameStatus = GameStatus.playing;
 
     _setupWorld();
@@ -96,13 +97,10 @@ class GameController {
 
   void _setupWorld() {
     buildings = _generateStores();
-
     targetPosition = _spawnTarget(avoidCurrentTarget: false);
-
     playerPosition = _pickInitialPlayerRoad();
     selectNextStore();
-
-    enemy = Enemy(_spawnEnemyRoadPosition(minManhattanDistance: 2));
+    _spawnEnemies();
   }
 
   void startTimer() {
@@ -122,6 +120,7 @@ class GameController {
         timeLeft = 0;
         gameStatus = GameStatus.finished;
         stopTimer();
+        stopEnemyMovement();
       }
 
       onTick?.call();
@@ -171,7 +170,7 @@ class GameController {
         return;
       }
 
-      moveEnemy();
+      moveEnemies();
       onTick?.call();
     });
   }
@@ -181,22 +180,24 @@ class GameController {
     _enemyTimer = null;
   }
 
-  void moveEnemy() {
-    final dirs = Direction.values.toList()..shuffle(_random);
+  void moveEnemies() {
+    for (final enemy in enemies) {
+      final dirs = Direction.values.toList()..shuffle(_random);
 
-    for (final dir in dirs) {
-      final next = _moved(enemy.position, dir);
-      if (!_isInBounds(next)) continue;
-      if (!isRoad(next)) continue;
-      enemy.position = next;
-      break;
+      for (final dir in dirs) {
+        final next = _moved(enemy.position, dir);
+        if (!_isInBounds(next)) continue;
+        if (!isRoad(next)) continue;
+        enemy.position = next;
+        break;
+      }
     }
 
     _checkCollision();
   }
 
   void _checkCollision() {
-    if (enemy.position == playerPosition) {
+    if (enemies.any((e) => e.position == playerPosition)) {
       _stunPlayer();
     }
   }
@@ -218,7 +219,15 @@ class GameController {
     isStunned = false;
   }
 
-  /// 道路は自由。店舗・配達先の建物マスは、**隣接する道路マス**からならどこからでも進入可能。
+  void _checkClearCondition() {
+    if (gameStatus != GameStatus.playing) return;
+    if (score < settings.clearScore) return;
+
+    gameStatus = GameStatus.cleared;
+    stopTimer();
+    stopEnemyMovement();
+  }
+
   bool canMove(Position from, Position to) {
     if (isRoad(to)) return true;
 
@@ -245,12 +254,27 @@ class GameController {
       hasPackage = false;
       targetPosition = _spawnTarget(avoidCurrentTarget: true);
       selectNextStore();
+      _checkClearCondition();
     }
   }
 
   void selectNextStore() {
     if (buildings.isEmpty) return;
     _currentStoreIndex = _random.nextInt(buildings.length);
+  }
+
+  void _spawnEnemies() {
+    enemies = [];
+    final occupied = <Position>{playerPosition};
+
+    for (var i = 0; i < settings.crabCount; i++) {
+      final pos = _spawnEnemyRoadPosition(
+        minManhattanDistance: 2,
+        occupied: occupied,
+      );
+      enemies.add(Enemy(pos));
+      occupied.add(pos);
+    }
   }
 
   List<Building> _generateStores() {
@@ -285,7 +309,6 @@ class GameController {
     return candidates.first;
   }
 
-  /// 空き(0)かつ上下左右のいずれかに道路(1)があるマス
   List<Position> _emptyCellsWithAdjacentRoad() {
     final out = <Position>[];
     for (var y = 0; y < gridSize; y++) {
@@ -325,14 +348,32 @@ class GameController {
     return roads.isEmpty ? const Position(0, 0) : roads.first;
   }
 
-  Position _spawnEnemyRoadPosition({required int minManhattanDistance}) {
+  Position _spawnEnemyRoadPosition({
+    required int minManhattanDistance,
+    required Set<Position> occupied,
+  }) {
     final roads = <Position>[];
     for (var y = 0; y < gridSize; y++) {
       for (var x = 0; x < gridSize; x++) {
         final p = Position(x, y);
         if (!isRoad(p)) continue;
-        final dist = (p.x - playerPosition.x).abs() + (p.y - playerPosition.y).abs();
-        if (dist < minManhattanDistance) continue;
+        if (occupied.contains(p)) continue;
+
+        final distToPlayer =
+            (p.x - playerPosition.x).abs() + (p.y - playerPosition.y).abs();
+        if (distToPlayer < minManhattanDistance) continue;
+
+        var tooCloseToOccupied = false;
+        for (final o in occupied) {
+          if (o == playerPosition) continue;
+          final d = (p.x - o.x).abs() + (p.y - o.y).abs();
+          if (d < 2) {
+            tooCloseToOccupied = true;
+            break;
+          }
+        }
+        if (tooCloseToOccupied) continue;
+
         roads.add(p);
       }
     }
@@ -340,16 +381,16 @@ class GameController {
     roads.shuffle(_random);
     if (roads.isNotEmpty) return roads.first;
 
-    // フォールバック：距離制約なしで道路から選ぶ
-    final anyRoads = <Position>[];
     for (var y = 0; y < gridSize; y++) {
       for (var x = 0; x < gridSize; x++) {
         final p = Position(x, y);
-        if (isRoad(p)) anyRoads.add(p);
+        if (!isRoad(p)) continue;
+        if (occupied.contains(p)) continue;
+        roads.add(p);
       }
     }
-    anyRoads.shuffle(_random);
-    return anyRoads.isEmpty ? const Position(0, 0) : anyRoads.first;
+    roads.shuffle(_random);
+    return roads.isEmpty ? const Position(0, 0) : roads.first;
   }
 
   static const List<(int, int)> _orthoDeltas = [
