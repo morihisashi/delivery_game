@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../controllers/game_controller.dart';
 import '../models/difficulty_settings.dart';
@@ -22,24 +23,58 @@ class GameScreen extends StatefulWidget {
 
 class _GameScreenState extends State<GameScreen> {
   late final GameController controller;
+  late final FocusNode _focusNode;
   Timer? _moveTimer;
 
   @override
   void initState() {
     super.initState();
 
+    _focusNode = FocusNode();
     final settings = DifficultySettings.forDifficulty(widget.difficulty);
     controller = GameController(settings: settings);
     controller.onTick = () => setState(() {});
     controller.resetGame();
     controller.startTimer();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+    });
   }
 
   @override
   void dispose() {
     _stopMoving();
+    _focusNode.dispose();
     controller.dispose();
     super.dispose();
+  }
+
+  Direction? _directionFromKey(LogicalKeyboardKey key) {
+    return switch (key) {
+      LogicalKeyboardKey.arrowUp => Direction.up,
+      LogicalKeyboardKey.arrowDown => Direction.down,
+      LogicalKeyboardKey.arrowLeft => Direction.left,
+      LogicalKeyboardKey.arrowRight => Direction.right,
+      _ => null,
+    };
+  }
+
+  void _handleKeyEvent(KeyEvent event) {
+    final dir = _directionFromKey(event.logicalKey);
+    if (dir == null) return;
+
+    if (event is KeyDownEvent) {
+      // ブラウザのキーリピートは無視し、自前Timerで連続移動する
+      if (event is KeyRepeatEvent) return;
+      if (controller.gameStatus != GameStatus.playing) return;
+      _startMoving(dir);
+      return;
+    }
+
+    if (event is KeyUpEvent) {
+      _stopMoving();
+    }
   }
 
   void _startMoving(Direction dir) {
@@ -77,148 +112,161 @@ class _GameScreenState extends State<GameScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: Column(
-        children: [
-          HudBar(controller: controller),
-          Expanded(
-            child: Center(
-              child: AspectRatio(
-                aspectRatio: 1,
-                child: GridView.builder(
-                  itemCount: GameController.gridSize * GameController.gridSize,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: GameController.gridSize,
-                  ),
-                  itemBuilder: (context, index) {
-                    final x = index % GameController.gridSize;
-                    final y = index ~/ GameController.gridSize;
+      body: KeyboardListener(
+        focusNode: _focusNode,
+        autofocus: true,
+        onKeyEvent: _handleKeyEvent,
+        child: Column(
+          children: [
+            HudBar(controller: controller),
+            Expanded(
+              child: Center(
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: GridView.builder(
+                    itemCount:
+                        GameController.gridSize * GameController.gridSize,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: GameController.gridSize,
+                    ),
+                    itemBuilder: (context, index) {
+                      final x = index % GameController.gridSize;
+                      final y = index ~/ GameController.gridSize;
 
-                    final p = Position(x, y);
+                      final p = Position(x, y);
 
-                    final isPlayer = p == controller.playerPosition;
-                    final isEnemy = controller.isEnemyAt(p);
-                    final isTarget = p == controller.targetPosition;
-                    final isCurrentStore =
-                        p == controller.currentStorePosition;
-                    final isOtherStore =
-                        !isCurrentStore &&
-                        controller.storePositions.contains(p);
+                      final isPlayer = p == controller.playerPosition;
+                      final isEnemy = controller.isEnemyAt(p);
+                      final isTarget = p == controller.targetPosition;
+                      final isCurrentStore =
+                          p == controller.currentStorePosition;
+                      final isOtherStore =
+                          !isCurrentStore &&
+                          controller.storePositions.contains(p);
 
-                    final color = () {
-                      if (isEnemy) return Colors.deepPurple.shade400;
-                      if (isTarget) return Colors.red.shade400;
-                      if (isCurrentStore) return Colors.green.shade600;
-                      if (isOtherStore) return Colors.green.shade200;
-                      if (controller.isRoad(p)) return Colors.grey.shade400;
-                      return Colors.white;
-                    }();
+                      final color = () {
+                        if (isEnemy) return Colors.deepPurple.shade400;
+                        if (isTarget) return Colors.red.shade400;
+                        if (isCurrentStore) return Colors.green.shade600;
+                        if (isOtherStore) return Colors.green.shade200;
+                        if (controller.isRoad(p)) return Colors.grey.shade400;
+                        return Colors.white;
+                      }();
 
-                    final child = () {
-                      final playerWidget = isPlayer
-                          ? Opacity(
-                              opacity: controller.hasPackage ? 1.0 : 0.7,
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.asset(
-                                  'assets/images/delivery_icon.jpg',
-                                  fit: BoxFit.cover,
+                      final child = () {
+                        final playerWidget = isPlayer
+                            ? Opacity(
+                                opacity: controller.hasPackage ? 1.0 : 0.7,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.asset(
+                                    'assets/images/delivery_icon.jpg',
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
+                              )
+                            : null;
+
+                        final enemyWidget = isEnemy
+                            ? const Center(
+                                child: Text(
+                                  '🦀',
+                                  style: TextStyle(fontSize: 20),
+                                ),
+                              )
+                            : null;
+
+                        if (playerWidget != null && enemyWidget != null) {
+                          return Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              playerWidget,
+                              Align(
+                                alignment: Alignment.center,
+                                child: enemyWidget,
                               ),
-                            )
-                          : null;
+                            ],
+                          );
+                        }
+                        if (playerWidget != null) return playerWidget;
+                        if (enemyWidget != null) return enemyWidget;
 
-                      final enemyWidget = isEnemy
-                          ? const Center(
-                              child: Text(
-                                '🦀',
-                                style: TextStyle(fontSize: 20),
-                              ),
-                            )
-                          : null;
+                        if (isTarget) {
+                          return const Center(
+                            child: Icon(
+                              Icons.location_on,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                          );
+                        }
+                        if (isCurrentStore) {
+                          return const Center(
+                            child: Icon(
+                              Icons.inventory_2,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                          );
+                        }
+                        if (isOtherStore) {
+                          return const Center(
+                            child: Icon(
+                              Icons.inventory_2_outlined,
+                              color: Colors.white54,
+                              size: 18,
+                            ),
+                          );
+                        }
+                        return null;
+                      }();
 
-                      if (playerWidget != null && enemyWidget != null) {
-                        return Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            playerWidget,
-                            Align(alignment: Alignment.center, child: enemyWidget),
-                          ],
-                        );
-                      }
-                      if (playerWidget != null) return playerWidget;
-                      if (enemyWidget != null) return enemyWidget;
-
-                      if (isTarget) {
-                        return const Center(
-                          child: Icon(
-                            Icons.location_on,
-                            color: Colors.white,
-                            size: 22,
-                          ),
-                        );
-                      }
-                      if (isCurrentStore) {
-                        return const Center(
-                          child: Icon(
-                            Icons.inventory_2,
-                            color: Colors.white,
-                            size: 22,
-                          ),
-                        );
-                      }
-                      if (isOtherStore) {
-                        return const Center(
-                          child: Icon(
-                            Icons.inventory_2_outlined,
-                            color: Colors.white54,
-                            size: 18,
-                          ),
-                        );
-                      }
-                      return null;
-                    }();
-
-                    return GridCell(color: color, child: child);
-                  },
+                      return GridCell(color: color, child: child);
+                    },
+                  ),
                 ),
               ),
             ),
-          ),
-          if (notPlaying)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  Text(
-                    cleared ? 'クリア！' : 'Game Over',
-                    style: const TextStyle(fontSize: 20),
-                  ),
-                  const SizedBox(height: 8),
-                  Text('Score: ${controller.score}/${controller.clearScore}'),
-                  const SizedBox(height: 8),
-                  ElevatedButton(
-                    onPressed: () {
-                      controller.resetGame();
-                      controller.startTimer();
-                    },
-                    child: const Text('もう一度'),
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('タイトルへ'),
-                  ),
-                ],
+            if (notPlaying)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  children: [
+                    Text(
+                      cleared ? 'クリア！' : 'Game Over',
+                      style: const TextStyle(fontSize: 20),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Score: ${controller.score}/${controller.clearScore}',
+                    ),
+                    const SizedBox(height: 8),
+                    ElevatedButton(
+                      onPressed: () {
+                        controller.resetGame();
+                        controller.startTimer();
+                        _focusNode.requestFocus();
+                      },
+                      child: const Text('もう一度'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('タイトルへ'),
+                    ),
+                  ],
+                ),
+              )
+            else
+              _Controls(
+                hasPackage: controller.hasPackage,
+                onStartMove: _startMoving,
+                onStopMove: _stopMoving,
               ),
-            )
-          else
-            _Controls(
-              hasPackage: controller.hasPackage,
-              onStartMove: _startMoving,
-              onStopMove: _stopMoving,
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
