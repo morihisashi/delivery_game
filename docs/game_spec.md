@@ -91,7 +91,9 @@
 
 * 初期位置：道路マスからランダム
 * 移動：上下左右1マス（道路、または隣接道路からの建物侵入のみ）
-* 操作：画面の方向ボタン（タップで1マス、長押しで連続移動）
+* 操作：
+  * **スマホ**：画面の方向ボタン（タップで1マス、長押しで連続移動）
+  * **Webブラウザ**：十字キー（↑↓←→）（1回押しで1マス、**長押しで連続移動**）
 * 表示：配達員画像アイコン
 
 ---
@@ -255,6 +257,26 @@ if score >= difficultySettings.clearScore:
 
 ---
 
+### 7.5 Webキーボード操作
+
+* `KeyboardListener` で `GameScreen` 全体のキー入力を受け取る
+* 画面表示時に `FocusNode` で自動フォーカス
+* 対応キー：↑ ↓ ← →
+
+| 操作 | 挙動 |
+| --- | --- |
+| キーを1回押す | 即座に1マス移動 |
+| キーを長押し | 連続移動（120ms間隔、タッチ長押しと同じ） |
+| キーを離す | 移動停止 |
+
+* `KeyDownEvent` で移動開始、`KeyUpEvent` で移動停止
+* ブラウザの `KeyRepeatEvent` は無視し、自前 `Timer.periodic` で連続移動する（暴走防止）
+* `gameStatus != playing` のときは入力無効
+* スタン中は `controller.step()` 内で移動不可
+* `dispose` で `FocusNode` を破棄
+
+---
+
 ### 7.4 ゲーム終了画面
 
 | 状態 | 表示 |
@@ -283,7 +305,7 @@ if score >= difficultySettings.clearScore:
 * 固定マップ表示（道路／空き）
 * 店舗5件の自動配置
 * 配達先のランダム生成
-* プレイヤー移動（長押し連続移動対応）
+* プレイヤー移動（タッチ長押し・Web十字キー長押し対応）
 * 指定店舗での荷物取得
 * 配達処理・スコア加算・クリア判定
 * 難易度別の蟹（1〜3匹）・スタン
@@ -306,7 +328,8 @@ if score >= difficultySettings.clearScore:
 * `GameController` に状態集約
 * 難易度は `DifficultySettings` + `GameDifficulty` enum
 * タイマー・蟹移動は `GameController` が管理、UI は `onTick` で再描画
-* 操作は `GameScreen` の `GestureDetector` + `Timer.periodic`（長押し）
+* 操作は `GameScreen` の `GestureDetector` + `Timer.periodic`（タッチ長押し）
+* Web操作は `KeyboardListener` + `FocusNode`（十字キー長押し、`KeyUpEvent` で停止）
 
 ---
 
