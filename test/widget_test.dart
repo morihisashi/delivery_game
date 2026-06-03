@@ -10,5 +10,6 @@ void main() {
     expect(find.text('かんたん'), findsOneWidget);
     expect(find.text('ふつう'), findsOneWidget);
     expect(find.text('むずかしい'), findsOneWidget);
+    expect(find.text('無限配達モード'), findsOneWidget);
   });
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/difficulty_settings.dart';
 import '../models/game_difficulty.dart';
 import 'game_screen.dart';
+import 'infinite_delivery_screen.dart';
 
 class TitleScreen extends StatelessWidget {
   const TitleScreen({super.key});
@@ -104,6 +105,51 @@ class TitleScreen extends StatelessWidget {
                 description:
                     '蟹${hard.crabCount}匹 / ${hard.timeLimitSeconds}秒 / クリア${hard.clearScore}点',
                 difficulty: GameDifficulty.hard,
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                '── その他のモード ──',
+                style: TextStyle(fontSize: 14, color: Colors.black54),
+              ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: _buttonHeight,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange.shade50,
+                      foregroundColor: Colors.black,
+                      elevation: 2,
+                      side: BorderSide(color: Colors.orange.shade300),
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const InfiniteDeliveryScreen(),
+                        ),
+                      );
+                    },
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '無限配達モード',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                        ),
+                        Text(
+                          '体力100 / 蟹2匹 / 配達でスコア / 体力0で終了',
+                          style: TextStyle(fontSize: 12, color: Colors.black87),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
             ],
