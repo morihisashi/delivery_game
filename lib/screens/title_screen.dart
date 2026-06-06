@@ -143,7 +143,7 @@ class TitleScreen extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          '体力100 / 蟹2匹 / 配達でスコア / 体力0で終了',
+                          '体力100 / 大型車3 / 軽自動車は配達で追加',
                           style: TextStyle(fontSize: 12, color: Colors.black87),
                         ),
                       ],

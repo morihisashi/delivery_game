@@ -7,6 +7,7 @@ import '../controllers/infinite_delivery_controller.dart';
 import '../models/direction.dart';
 import '../models/game_status.dart';
 import '../models/position.dart';
+import '../models/vehicle_type.dart';
 import '../widgets/grid_cell.dart';
 import '../widgets/infinite_hud_bar.dart';
 
@@ -129,7 +130,13 @@ class _InfiniteDeliveryScreenState extends State<InfiniteDeliveryScreen> {
 
                       final isPlayer = p == controller.playerPosition;
                       final isCrab = controller.isCrabAt(p);
-                      final isVehicle = controller.isVehicleAt(p);
+                      final cellVehicles = controller.vehiclesAt(p);
+                      final hasLarge = cellVehicles.any(
+                        (v) => v.type == VehicleType.large,
+                      );
+                      final hasLight = cellVehicles.any(
+                        (v) => v.type == VehicleType.light,
+                      );
                       final isTarget = p == controller.targetPosition;
                       final isCurrentStore =
                           p == controller.currentStorePosition;
@@ -138,7 +145,8 @@ class _InfiniteDeliveryScreenState extends State<InfiniteDeliveryScreen> {
                           controller.storePositions.contains(p);
 
                       final color = () {
-                        if (isVehicle) return Colors.blueGrey.shade700;
+                        if (hasLarge) return Colors.red.shade800;
+                        if (hasLight) return Colors.lightBlue.shade300;
                         if (isCrab) return Colors.deepPurple.shade400;
                         if (isTarget) return Colors.red.shade400;
                         if (isCurrentStore) return Colors.green.shade600;
@@ -150,13 +158,26 @@ class _InfiniteDeliveryScreenState extends State<InfiniteDeliveryScreen> {
                       final child = () {
                         final layers = <Widget>[];
 
-                        if (isVehicle) {
+                        if (hasLarge) {
                           layers.add(
                             const Center(
                               child: Icon(
-                                Icons.directions_car,
+                                Icons.local_shipping,
                                 color: Colors.white,
-                                size: 22,
+                                size: 24,
+                              ),
+                            ),
+                          );
+                        }
+                        if (hasLight) {
+                          layers.add(
+                            Center(
+                              child: Icon(
+                                Icons.directions_car,
+                                color: hasLarge
+                                    ? Colors.yellow.shade100
+                                    : Colors.white,
+                                size: 18,
                               ),
                             ),
                           );
