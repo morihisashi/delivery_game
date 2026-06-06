@@ -1,0 +1,1 @@
+enum VehicleType { large, light }

@@ -1,9 +1,14 @@
-import 'direction.dart';
 import 'position.dart';
+import 'vehicle_type.dart';
 
 class Vehicle {
-  Vehicle(this.position, {this.lastMove});
+  Vehicle(
+    this.position, {
+    required this.type,
+    this.previousPosition,
+  });
 
   Position position;
-  Direction? lastMove;
+  Position? previousPosition;
+  VehicleType type;
 }

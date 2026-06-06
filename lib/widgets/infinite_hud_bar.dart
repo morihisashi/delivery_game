@@ -20,7 +20,7 @@ class InfiniteHudBar extends StatelessWidget {
           const SizedBox(height: 4),
           Text('スコア: ${controller.score}'),
           const SizedBox(height: 4),
-          Text('車台数: ${controller.vehicles.length}'),
+          Text('大型車: ${controller.largeVehicleCount}  軽自動車: ${controller.lightVehicleCount}'),
           const SizedBox(height: 4),
           Text('状態: $statusText  指定店舗: ${controller.currentStorePosition}'),
         ],

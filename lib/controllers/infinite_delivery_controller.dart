@@ -10,14 +10,18 @@ import '../models/enemy.dart';
 import '../models/game_status.dart';
 import '../models/position.dart';
 import '../models/vehicle.dart';
+import '../models/vehicle_type.dart';
 
 class InfiniteDeliveryController {
   static const int gridSize = 10;
   static const int storeCount = 5;
   static const int maxHp = 100;
   static const int crabCount = 2;
-  static const int deliveriesPerExtraCar = 5;
-  static const int carMovesPerTick = 1;
+  static const int initialLargeVehicleCount = 3;
+  static const int lightVehicleInterval = 5;
+  static const int lightVehicleAccelerateScore = 50;
+  static const int largeVehicleDamage = 20;
+  static const int lightVehicleDamage = 3;
 
   InfiniteDeliveryController({Random? random}) : _random = random ?? Random();
 
@@ -42,9 +46,24 @@ class InfiniteDeliveryController {
 
   int get deliveryCount => score;
 
-  int get targetVehicleCount => 1 + (score ~/ deliveriesPerExtraCar);
+  int get largeVehicleCount =>
+      vehicles.where((v) => v.type == VehicleType.large).length;
+
+  int get lightVehicleCount =>
+      vehicles.where((v) => v.type == VehicleType.light).length;
+
+  int get targetLightVehicleCount {
+    if (score < lightVehicleAccelerateScore) {
+      return score ~/ lightVehicleInterval;
+    }
+    return (lightVehicleAccelerateScore - 1) ~/ lightVehicleInterval +
+        (score - (lightVehicleAccelerateScore - 1));
+  }
 
   bool isCrabAt(Position p) => crabs.any((c) => c.position == p);
+
+  List<Vehicle> vehiclesAt(Position p) =>
+      vehicles.where((v) => v.position == p).toList();
 
   bool isVehicleAt(Position p) => vehicles.any((v) => v.position == p);
 
@@ -79,9 +98,18 @@ class InfiniteDeliveryController {
     playerPosition = _pickInitialPlayerRoad();
     selectNextStore();
     _spawnCrabs();
-    vehicles = [
-      Vehicle(_spawnRoadPosition(occupied: _occupiedPositions())),
-    ];
+    _spawnLargeVehicles();
+    vehicles.removeWhere((v) => v.type == VehicleType.light);
+  }
+
+  void _spawnLargeVehicles() {
+    vehicles.removeWhere((v) => v.type == VehicleType.large);
+    final occupied = _occupiedPositions();
+    for (var i = 0; i < initialLargeVehicleCount; i++) {
+      final pos = _spawnRoadPosition(occupied: occupied);
+      vehicles.add(Vehicle(pos, type: VehicleType.large));
+      occupied.add(pos);
+    }
   }
 
   void startGameTimer() {
@@ -165,7 +193,7 @@ class InfiniteDeliveryController {
       hasPackage = false;
       targetPosition = _spawnTarget(avoidCurrentTarget: true);
       selectNextStore();
-      _syncVehicleCount();
+      _syncLightVehicleCount();
     }
   }
 
@@ -191,9 +219,26 @@ class InfiniteDeliveryController {
   }
 
   void _checkVehicleCollision() {
-    if (!vehicles.any((v) => v.position == playerPosition)) return;
+    final hit =
+        vehicles.where((v) => v.position == playerPosition).toList(growable: false);
+    if (hit.isEmpty) return;
 
-    hp -= 20;
+    var damage = 0;
+    final removeIds = <Vehicle>{};
+
+    for (final vehicle in hit) {
+      switch (vehicle.type) {
+        case VehicleType.large:
+          damage += largeVehicleDamage;
+        case VehicleType.light:
+          damage += lightVehicleDamage;
+          removeIds.add(vehicle);
+      }
+    }
+
+    vehicles.removeWhere(removeIds.contains);
+
+    hp -= damage;
     if (hp <= 0) {
       hp = 0;
       gameStatus = GameStatus.finished;
@@ -214,36 +259,40 @@ class InfiniteDeliveryController {
     }
   }
 
-  void _syncVehicleCount() {
+  void _syncLightVehicleCount() {
+    final target = targetLightVehicleCount;
     final occupied = _occupiedPositions();
-    while (vehicles.length < targetVehicleCount) {
-      vehicles.add(Vehicle(_spawnRoadPosition(occupied: occupied)));
-      occupied.add(vehicles.last.position);
+
+    while (lightVehicleCount < target) {
+      final pos = _spawnRoadPosition(occupied: occupied);
+      vehicles.add(Vehicle(pos, type: VehicleType.light));
+      occupied.add(pos);
     }
   }
 
   void _moveAllVehicles() {
     for (final vehicle in vehicles) {
-      for (var i = 0; i < carMovesPerTick; i++) {
-        _moveVehicleOneStep(vehicle);
-      }
+      _moveVehicleOneStep(vehicle);
     }
   }
 
   void _moveVehicleOneStep(Vehicle vehicle) {
-    final neighbors = _roadNeighbors(vehicle.position);
-    if (neighbors.isEmpty) return;
+    var neighbors = _roadNeighbors(vehicle.position);
 
-    final from = vehicle.position;
-    final Position next;
-    if (neighbors.length == 1) {
-      next = neighbors.first;
-    } else {
-      next = (List<Position>.from(neighbors)..shuffle(_random)).first;
+    if (vehicle.previousPosition != null) {
+      neighbors = neighbors
+          .where((n) => n != vehicle.previousPosition)
+          .toList();
     }
 
+    if (neighbors.isEmpty) {
+      neighbors = _roadNeighbors(vehicle.position);
+    }
+    if (neighbors.isEmpty) return;
+
+    final next = (List<Position>.from(neighbors)..shuffle(_random)).first;
+    vehicle.previousPosition = vehicle.position;
     vehicle.position = next;
-    vehicle.lastMove = _directionBetween(from, next);
   }
 
   List<Position> _roadNeighbors(Position p) {
@@ -359,13 +408,6 @@ class InfiniteDeliveryController {
     }
     roads.shuffle(_random);
     return roads.isEmpty ? const Position(0, 0) : roads.first;
-  }
-
-  Direction _directionBetween(Position from, Position to) {
-    if (to.x > from.x) return Direction.right;
-    if (to.x < from.x) return Direction.left;
-    if (to.y > from.y) return Direction.down;
-    return Direction.up;
   }
 
   static const List<(int, int)> _orthoDeltas = [
